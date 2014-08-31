@@ -29,60 +29,70 @@ func dec(s string) error {
 		return e
 	}
 	p := native.NewParser(bs)
-	return ph(p)
+	return ph("", p)
 }
 
-func ph(p *native.Parser) error {
+func ph(pre string, p *native.Parser) error {
 	var w0, w1, w2 uint16
 	var l0, l1, l2 uint32
 	var b0, b1, b2 uint8
 	p.U32(&l0).U16(&w0).U16(&w1).U32(&l1).U32(&l2).Byte(&b0).Byte(&b1).U16(&w2)
-	fmt.Printf("=================================================================\n")
-	fmt.Printf("Total len: %08X data bytes: %d\n", l0, l0-20)
-	fmt.Printf("Op:        %04X %s\n", w0, u2s(ms[:], int(w0&nfnlopmask)))
-	fmt.Printf("Type:      %04X\n", w1)
-	fmt.Printf("Seq:       %08X\n", l1)
-	fmt.Printf("Zero:      %08X\n", l2)
-	fmt.Printf("Family:    %02X\n", b0)
-	fmt.Printf("Version:   %02X\n", b1)
-	fmt.Printf("Resource:  %04X\n", w2)
+	fmt.Printf(pre + "=================================================================\n")
+	fmt.Printf(pre+"Total len: %08X data bytes: %d\n", l0, l0-20)
+	fmt.Printf(pre+"Op:        %04X %s\n", w0, u2s(ms[:], int(w0&nfnlopmask)))
+	fmt.Printf(pre+"Type:      %04X\n", w1)
+	fmt.Printf(pre+"Seq:       %08X\n", l1)
+	fmt.Printf(pre+"Zero:      %08X\n", l2)
+	fmt.Printf(pre+"Family:    %02X\n", b0)
+	fmt.Printf(pre+"Version:   %02X\n", b1)
+	fmt.Printf(pre+"Resource:  %04X\n", w2)
 	_, _, _ = w2, b1, b2
 	if w0 == 16 {
 		for !p.AtEnd() {
-			e := ph(p)
+			e := ph(pre, p)
 			if e != nil {
 				return e
 			}
 		}
 	} else {
-		var cl = uint32(20)
-		for !p.AtEnd() && cl < l0 {
-			var l, t uint16
-			var raw []byte
-			p.U16(&l).U16(&t)
-			cl += lpa(l)
-			fmt.Printf("-----------------------------------------------------------------\n")
-			fmt.Printf("Len:       %04X\n", l)
-			fmt.Printf("Typ:       %04X\n", t)
-			switch t {
-			default:
-				if l < 4 {
-					return errors.New("Too short attr")
-				}
-				p.NBytes(int(l)-4, &raw)
-				fmt.Printf("Raw:       %X\n", raw)
-			}
-			p.Align(4)
-		}
+		return ah(pre, int(l0)-20, p)
 	}
 	return nil
 }
 
-func lpa(rl uint16) uint32 {
+func ah(pre string, max int, p *native.Parser) error {
+	var cl int
+	for !p.AtEnd() && cl < max {
+		var l, t uint16
+		var raw []byte
+		p.U16(&l).U16(&t)
+		cl += lpa(l)
+		fmt.Printf(pre + "-----------------------------------------------------------------\n")
+		fmt.Printf(pre+"Len:       %04X\n", l)
+		fmt.Printf(pre+"Typ:       %04X\n", t)
+		switch {
+		case t&0xFF00 == 0x8000:
+			e := ah(pre+"  ", int(l)-4, p)
+			if e != nil {
+				return e
+			}
+		default:
+			if l < 4 {
+				return errors.New("Too short attr")
+			}
+			p.NBytes(int(l)-4, &raw)
+			fmt.Printf(pre+"Raw:       %X\n", raw)
+		}
+		p.Align(4)
+	}
+	return nil
+}
+
+func lpa(rl uint16) int {
 	if rl&3 != 0 {
 		rl = (rl &^ 3) + 4
 	}
-	return uint32(rl)
+	return int(rl)
 }
 
 func u2s(s []string, i int) string {
