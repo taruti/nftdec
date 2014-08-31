@@ -68,7 +68,7 @@ func ah(pre string, max int, p *native.Parser) error {
 		p.U16(&l).U16(&t)
 		cl += lpa(l)
 		fmt.Printf(pre + "-----------------------------------------------------------------\n")
-		fmt.Printf(pre+"Len:       %04X\n", l)
+		fmt.Printf(pre+"Len:       %04X data bytes %d\n", l, l-4)
 		fmt.Printf(pre+"Typ:       %04X\n", t)
 		switch {
 		case t&0xFF00 == 0x8000:
@@ -81,7 +81,15 @@ func ah(pre string, max int, p *native.Parser) error {
 				return errors.New("Too short attr")
 			}
 			p.NBytes(int(l)-4, &raw)
-			fmt.Printf(pre+"Raw:       %X\n", raw)
+			var srep string
+			if t <= 0xFF {
+				srep = mstring(raw)
+			}
+			if srep == "" {
+				fmt.Printf(pre+"Raw:       %X\n", raw)
+			} else {
+				fmt.Printf(pre+"Raw:       %X \"%s\"\n", raw, srep)
+			}
 		}
 		p.Align(4)
 	}
@@ -176,4 +184,16 @@ var subsys = [...]string{
 	NFNL_SUBSYS_NFTABLES:          "NFNL_SUBSYS_NFTABLES",
 	NFNL_SUBSYS_NFT_COMPAT:        "NFNL_SUBSYS_NFT_COMPAT",
 	NFNL_SUBSYS_COUNT:             "NFNL_SUBSYS_COUNT",
+}
+
+func mstring(bs []byte) string {
+	if len(bs) == 0 || bs[len(bs)-1] != 0 {
+		return ""
+	}
+	for _, b := range bs[:len(bs)-1] {
+		if b > 0x7E || b < ' ' {
+			return ""
+		}
+	}
+	return string(bs[:len(bs)-1])
 }
