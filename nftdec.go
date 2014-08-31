@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/taruti/native"
 	"os"
+	"strings"
 )
 
 func main() {
@@ -22,6 +23,7 @@ func main() {
 }
 
 func dec(s string) error {
+	s = strings.NewReplacer(`x`, ``, `\`, ``, `"`, ``).Replace(s)
 	bs, e := hex.DecodeString(s)
 	if e != nil {
 		return e
